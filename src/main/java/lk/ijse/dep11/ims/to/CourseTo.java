@@ -23,10 +23,8 @@ public class CourseTo implements Serializable {
     private String name;
     @NotBlank(message = "duration shouldn't be blank",groups = Create.class)
     @Pattern(regexp = "^[0-9]+")
-    private Integer duration;
+    private Integer durationInMonths;
 
     public interface Create extends Default {}
-
-    public interface Update extends Default {}
 }
 
