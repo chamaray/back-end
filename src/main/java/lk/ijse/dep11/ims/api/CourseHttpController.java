@@ -24,7 +24,7 @@ public class CourseHttpController {
     public CourseHttpController(){
         HikariConfig config = new HikariConfig();
         config.setUsername("root");
-        config.setPassword("mysql");
+        config.setPassword("13823Textile?");
         config.setJdbcUrl("jdbc:mysql://localhost:3306/dep11_ims_app");
         config.setDriverClassName("com.mysql.cj.jdbc.Driver");
         config.addDataSourceProperty("maximumPoolSize",10);
@@ -37,7 +37,7 @@ public class CourseHttpController {
     }
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping(produces = "application/json", consumes = "application/json")
-    public CourseTo createCourse(@RequestBody @Validated(CourseTo.Create.class) CourseTo course){
+    public CourseTo createCourse(@RequestBody  CourseTo course){
         System.out.printf("createCourse()");
         try(Connection connection = pool.getConnection()){
             PreparedStatement stm = connection.prepareStatement("INSERT INTO course (name,duration_in_months) VALUES (?,?)", Statement.RETURN_GENERATED_KEYS);
@@ -59,11 +59,11 @@ public class CourseHttpController {
     public void deleteCourse(@PathVariable("id") Integer courseId){
         try (Connection connection = pool.getConnection()) {
             Statement stm = connection.createStatement();
-            ResultSet rst = stm.executeQuery( String.format("SELECT * FROM course WHERE id=%s",courseId));
+            ResultSet rst = stm.executeQuery( String.format("SELECT * FROM course WHERE id=%d",courseId));
             if(!rst.next()){
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND,"The course not found");
             }
-            connection.createStatement().executeUpdate( String.format("DELETE FROM course WHERE id=?",courseId));
+            connection.createStatement().executeUpdate( String.format("DELETE FROM course WHERE id=%d",courseId));
         }catch (SQLException e){
             new RuntimeException(e);
         }
@@ -71,9 +71,12 @@ public class CourseHttpController {
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PatchMapping(value = "/{id}", consumes = "application/json")
-    public void updateCourse(@PathVariable("id") Integer courseId, @RequestBody @Valid CourseTo course){
+    public void updateCourse(@PathVariable("id") Integer courseId, @RequestBody CourseTo course){
         try (Connection connection = pool.getConnection()) {
-            ResultSet rst = connection.prepareStatement("SELECT * FROM course WHERE id=?").executeQuery();
+            PreparedStatement stmValidate = connection.prepareStatement("SELECT * FROM course WHERE id=?");
+            stmValidate.setInt(1,courseId);
+            ResultSet rst = stmValidate.executeQuery();
+
             if(!rst.next()){
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND,"The course not found");
             }
@@ -121,7 +124,7 @@ public class CourseHttpController {
             PreparedStatement stm = connection.prepareStatement("SELECT teacher_id FROM teacher_course WHERE course_id=?");
             stm.setInt(1,courseId);
             ResultSet rst = stm.executeQuery();
-            while ()
+
         }catch (SQLException e){
             throw new RuntimeException(e);
         }

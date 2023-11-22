@@ -107,14 +107,12 @@ public class TeacherHttpController {
 
     @GetMapping(value = "/{id}",produces = "application/json")
     public TeacherTo getTeacher(@PathVariable int id){
-        try(Connection connection = pool.getConnection()){
-            Statement stm = connection.createStatement();
-            return null;
+        try(Connection connection= pool.getConnection()){
+            ResultSet rst = connection.createStatement().executeQuery(String.format("SELECT * FROM teacher WHERE id=%s",id));
+            return new TeacherTo(rst.getInt("id"),rst.getString("name"), rst.getString("contact") );
         }catch (SQLException e){
             throw new RuntimeException(e);
         }
-
-
     }
 }
 
