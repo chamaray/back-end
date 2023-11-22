@@ -3,6 +3,7 @@ package lk.ijse.dep11.ims.api;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import lk.ijse.dep11.ims.to.CourseTo;
+import lk.ijse.dep11.ims.to.TeacherTo;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +20,7 @@ import java.util.List;
 @RequestMapping("/courses")
 @CrossOrigin
 public class CourseHttpController {
-    private HikariDataSource pool;
+    private final HikariDataSource pool;
 
     public CourseHttpController(){
         HikariConfig config = new HikariConfig();
@@ -27,7 +28,7 @@ public class CourseHttpController {
         config.setPassword("mysql");
         config.setJdbcUrl("jdbc:mysql://localhost:3306/dep11_ims_app");
         config.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        config.addDataSourceProperty("maximumPoolSize",10);
+        config.addDataSourceProperty("maximumPoolSize", 10);
         pool = new HikariDataSource(config);
     }
 
@@ -37,8 +38,8 @@ public class CourseHttpController {
     }
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping(produces = "application/json", consumes = "application/json")
-    public CourseTo createCourse(@RequestBody @Validated(CourseTo.Create.class) CourseTo course){
-        System.out.printf("createCourse()");
+    public CourseTo createCourse(@RequestBody CourseTo course){
+        System.out.println("createCourse()");
         try(Connection connection = pool.getConnection()){
             PreparedStatement stm = connection.prepareStatement("INSERT INTO course (name,duration_in_months) VALUES (?,?)", Statement.RETURN_GENERATED_KEYS);
             stm.setString(1,course.getName());
@@ -116,12 +117,58 @@ public class CourseHttpController {
 
     @PostMapping(value = "/{courseId}/teachers", produces = "application/json", consumes = "application/json")
     @ResponseStatus(HttpStatus.CREATED)
-    public void assignTeachersToCourses(@PathVariable Integer courseId){
+    public void assignTeachersToCourses(@PathVariable Integer courseId, @RequestBody TeacherTo teacher){
         try (Connection connection = pool.getConnection()) {
-            PreparedStatement stm = connection.prepareStatement("SELECT teacher_id FROM teacher_course WHERE course_id=?");
+            PreparedStatement stmValidate = connection.prepareStatement("SELECT * FROM teacher_course WHERE course_id=? AND teacher_id=?");
+            stmValidate.setInt(1,courseId);
+            stmValidate.setInt(2,teacher.getId());
+            ResultSet rst = stmValidate.executeQuery();
+            if(rst.next()){
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Teacher already exists");
+            }
+            PreparedStatement stm = connection.prepareStatement("INSERT INTO teacher_course (teacher_id,course_id) VALUES (?,?)");
+            stm.setInt(1,teacher.getId());
+            stm.setInt(2,courseId);
+            stm.executeUpdate();
+            //Todo: return
+        }catch (SQLException e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    @GetMapping(value = "/{courseId}/teachers", produces = "application/json")
+    public List<TeacherTo> allTeachersAssociatedWithCourse(@PathVariable Integer courseId){
+        try (Connection connection = pool.getConnection()) {
+            PreparedStatement stm = connection.prepareStatement(
+                    "SELECT (id,name,contact) FROM teacher INNER JOIN" +
+                            "(SELECT (teacher_id AS tid) FROM teacher_course WHERE course_id=?) ON tid=id");
             stm.setInt(1,courseId);
             ResultSet rst = stm.executeQuery();
-            while ()
+            if(!rst.next()){
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Not teachers associated with the course");
+            }
+            List<TeacherTo> teacherList = new LinkedList<>();
+            while (rst.next()){
+                teacherList.add(new TeacherTo(rst.getInt("id"),rst.getString("name"),rst.getString("contact")));
+            }
+            return teacherList;
+        }catch (SQLException e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    @DeleteMapping("/{courseId}/teachers/{teacherId}")
+    public void removeTeacherFromCourse(@PathVariable("courseId") Integer courseId, @PathVariable("teacherId") Integer teacherId){
+        try (Connection connection = pool.getConnection()) {
+            PreparedStatement stmValidate = connection.prepareStatement("SELECT * FROM teacher_course WHERE teacher_id=? AND course_id=?");
+            ResultSet rstValidate = stmValidate.executeQuery();
+            if(!rstValidate.next()){
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND,"The teacher is not associated with relevant course");
+            }
+            PreparedStatement stm = connection.prepareStatement("DELETE FROM teacher_course WHERE teacher_id=? AND course_id=?");
+            stm.setInt(1,teacherId);
+            stm.setInt(2,courseId);
+            stm.executeUpdate();
         }catch (SQLException e){
             throw new RuntimeException(e);
         }
